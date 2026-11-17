@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="es">
+<!--
+* index.html
+* -------------------------------------------------------------
+* Frontend del sistema POS local - Drip & Drop.
+* Incluye: login de administrador, portada (Inicio), Punto de
+* Venta (menu + carrito), Historial de ordenes, Reportes de
+* ventas y Configuracion del sistema.
+*
+* El login es una barrera simple en el navegador (usuario fijo
+* "administrador", contrasena fija "1234"), pensada para uso
+* interno en un solo equipo local - no sustituye una autenticacion
+* de servidor con base de datos.
+* -------------------------------------------------------------
+* Requiere: Apache + PHP (XAMPP) con extension GD. No necesita
+* base de datos: el historial y la configuracion se guardan en
+* archivos JSON dentro de esta misma carpeta.
+-->
+<head>
+    <link rel="icon" type="image/png" href="img/png/logo.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drip & Drop | Punto de Venta</title>
+    <style>
+        :root {
+            /* Paleta Elegante: Vino y Blanco */
+            --vino-oscuro: #6b1d2f;
+            --vino-medio: #800020;
+            --vino-claro: #881337;
+            --vino-hover: #5a1827;
+            --blanco: #ffffff;
+            --crema: #fafaf7;
+            --texto-oscuro: #2c2c2c;
+            --texto-claro: #ffffff;
+            --texto-gris: #666666;
+            --borde: #eaeaea;
+            --radio: 12px;
+            --sombra: 0 6px 20px rgba(107, 29, 47, 0.08);
+        }
+
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--crema);
+            color: var(--texto-oscuro);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ---------- Encabezado ---------- */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 28px;
+            background: var(--blanco);
+            border-bottom: 1px solid var(--borde);
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        header .marca {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--texto-oscuro);
+        }
+        header h1 span { color: var(--vino-oscuro); }
+        .logo-icono {
+            height: 46px;
+            width: 46px;
+            border-radius: 8px;
+            object-fit: cover;
+        }
+        #ultimaOrden {
+            font-family: 'Courier New', monospace;
+            background: var(--vino-oscuro);
+            border-radius: var(--radio);
+            padding: 8px 20px;
+            font-size: 1.15rem;
+            font-weight: bold;
+            color: var(--texto-claro);
+            text-align: center;
+            min-width: 180px;
+            box-shadow: var(--sombra);
+        }
+        #ultimaOrden small {
+            display: block;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: .65rem;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.8);
+            font-weight: 600;
+        }
+
+        /* ---------- Navegación principal ---------- */
+        nav.nav-principal {
+            display: flex;
+            gap: 12px;
+            padding: 0 28px;
+            background: var(--blanco);
+            border-bottom: 1px solid var(--borde);
+            overflow-x: auto;
+        }
+        .nav-btn {
+            background: none;
+            border: none;
+            padding: 16px 18px;
+            font-size: .9rem;
+            font-weight: 700;
+            color: var(--texto-gris);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
+            transition: color 0.2s;
+        }
+        .nav-btn:hover { color: var(--vino-oscuro); }
+        .nav-btn.activo {
+            color: var(--vino-oscuro);
+            border-bottom-color: var(--vino-oscuro);
+        }
+
+        /* ---------- Vistas ---------- */
+        .vista { display: none; padding: 24px 28px; }
+        .vista.activa { display: block; }
+        h2 {
+            margin: 0 0 16px;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            font-weight: 800;
+            color: var(--vino-oscuro);
+        }
+
+        /* =================================================================
+           VISTA: INICIO
+           ================================================================= */
+        .hero-inicio {
+            background: linear-gradient(135deg, var(--vino-oscuro), var(--vino-medio));
+            border-radius: var(--radio);
+            padding: 50px 36px;
+            text-align: center;
+            color: var(--texto-claro);
+            margin-bottom: 24px;
+            box-shadow: var(--sombra);
+        }
+        .hero-inicio h2 {
+            color: var(--texto-claro);
+            font-size: 2.2rem;
+            margin-bottom: 8px;
+        }
+        .hero-inicio h2 span { color: var(--crema); opacity: 0.8; }
+        .hero-inicio p {
+            margin: 0 0 24px;
+            color: rgba(255,255,255,.85);
+            font-size: 1.05rem;
+        }
+        .hero-inicio button {
+            background: var(--blanco);
+            color: var(--vino-oscuro);
+            border: none;
+            padding: 14px 34px;
+            border-radius: var(--radio);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            cursor: pointer;
+            font-size: .95rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            transition: background 0.2s, transform 0.1s;
+        }
+        .hero-inicio button:hover {
+            background: var(--crema);
+            transform: translateY(-2px);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+        }
+        .stat-card {
+            background: var(--blanco);
+            border: 1px solid var(--borde);
+            border-radius: var(--radio);
+            padding: 24px;
+            box-shadow: var(--sombra);
+            text-align: center;
+        }
+        .stat-card .etiqueta {
+            font-size: .75rem;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            color: var(--texto-gris);
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        .stat-card .valor {
+            font-family: 'Courier New', monospace;
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--vino-oscuro);
+        }
+
+        /* =================================================================
+           VISTA: PUNTO DE VENTA (menú + carrito)
+           ================================================================= */
+        #ventaGrid {
+            display: grid;
+            grid-template-columns: 1.6fr 1fr;
+            gap: 28px;
+            align-items: start;
+        }
+        @media (max-width: 900px) {
+            #ventaGrid { grid-template-columns: 1fr; }
+        }
+        #buscador {
+            width: 100%;
+            padding: 14px 18px;
+            margin-bottom: 18px;
+            background: var(--blanco);
+            border: 1px solid var(--borde);
+            border-radius: var(--radio);
+            color: var(--texto-oscuro);
+            font-size: 1rem;
+            box-shadow: var(--sombra);
+            transition: border-color 0.2s;
+        }
+        #buscador:focus { outline: none; border-color: var(--vino-claro); }
+
+        #tabsCategorias {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 22px;
+        }
+        .tab-categoria {
+            background: var(--blanco);
+            border: 1px solid var(--borde);
+            color: var(--texto-gris);
+            padding: 10px 18px;
+            border-radius: 20px;
+            font-size: .85rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .tab-categoria:hover { border-color: var(--vino-claro); color: var(--vino-oscuro); }
+        .tab-categoria.activa {
+            background: var(--vino-oscuro);
+            color: var(--texto-claro);
+            border-color: var(--vino-oscuro);
+        }
+
+        #gridMenu {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
+        }
+        .producto {
+            background: var(--blanco);
+            border: 1px solid var(--borde);
+            border-radius: var(--radio);
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: var(--sombra);
+            transition: transform .15s ease, box-shadow .15s ease;
+        }
+        .producto:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(107, 29, 47, 0.12);
+        }
+        .producto .categoria-tag {
+            font-size: .65rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            font-weight: 700;
+            color: var(--vino-claro);
+        }
+        .producto .nombre {
+            font-weight: 700;
+            font-size: 1rem;
+            line-height: 1.3;
+            color: var(--texto-oscuro);
+        }
+        .producto .nota {
+            font-size: .78rem;
+            color: var(--texto-gris);
+            line-height: 1.4;
+        }
+        .producto .precio {
+            display: inline-block;
+            font-family: 'Courier New', monospace;
+            background: var(--crema);
+            color: var(--vino-oscuro);
+            border: 1px solid var(--borde);
+            font-size: 1rem;
+            font-weight: 800;
+            padding: 4px 12px;
+            border-radius: 8px;
+            width: fit-content;
+        }
+        .btn-agregar {
+            margin-top: auto;
+            background: var(--crema);
+            color: var(--vino-oscuro);
+            border: 1px solid var(--vino-oscuro);
+            border-radius: 8px;
+            padding: 10px;
+            font-weight: 700;
+            letter-spacing: .04em;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-size: .8rem;
+            transition: all .15s ease;
+        }
+        .btn-agregar:active { transform: scale(.97); }
+        .btn-agregar:hover {
+            background: var(--vino-oscuro);
+            color: var(--blanco);
+        }
+
+        /* --- Panel de Comandas (Carrito) --- */
+        #carrito {
+            background: linear-gradient(180deg, var(--vino-oscuro), var(--vino-medio));
+            border-radius: var(--radio);
+            padding: 24px;
+            position: sticky;
+            top: 24px;
+            box-shadow: var(--sombra);
+            color: var(--texto-claro);
+        }
+        #carrito h2 { color: var(--blanco); margin-bottom: 18px; }
+
+        #listaCarrito {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            max-height: 45vh;
+            overflow-y: auto;
+            border-bottom: 1px dashed rgba(255,255,255,.3);
+        }
+        /* Estilizando el scroll del carrito */
+        #listaCarrito::-webkit-scrollbar { width: 6px; }
+        #listaCarrito::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 10px; }
+
+        #listaCarrito li {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 4px;
+            border-bottom: 1px solid rgba(255,255,255,.1);
+            font-size: .95rem;
+        }
+        #listaCarrito li .nombreItem { font-weight: 600; }
+        .controlesCantidad {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-cantidad {
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,.4);
+            background: transparent;
+            color: var(--texto-claro);
+            cursor: pointer;
+            font-weight: bold;
+            font-size: .9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-cantidad:hover { background: var(--blanco); color: var(--vino-oscuro); }
+        .controlesCantidad .cantidad {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            min-width: 20px;
+            text-align: center;
+        }
+        #listaCarrito li .subtotal {
+            font-family: 'Courier New', monospace;
+            font-weight: 800;
+            min-width: 70px;
+            text-align: right;
+        }
+        #listaCarrito .vacio {
+            text-align: center;
+            color: rgba(255,255,255,.6);
+            padding: 30px 0;
+            font-style: italic;
+        }
+
+        #totalBox {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 20px 4px;
+            font-size: 1.6rem;
+        }
+        #totalBox span:first-child {
+            text-transform: uppercase;
+            font-size: .9rem;
+            letter-spacing: .1em;
+            color: rgba(255,255,255,.7);
+        }
+        #totalGeneral {
+            font-family: 'Courier New', monospace;
+            font-weight: 800;
+        }
+
+        #btnImprimir {
+            width: 100%;
+            padding: 18px;
+            font-size: 1.05rem;
+            font-weight: 800;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            background: var(--blanco);
+            color: var(--vino-oscuro);
+            border: none;
+            border-radius: var(--radio);
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: background .15s ease, transform .1s;
+        }
+        #btnImprimir:hover { background: var(--crema); transform: translateY(-2px); }
+        #btnImprimir:disabled {
+            background: rgba(255,255,255,.15);
+            color: rgba(255,255,255,.4);
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+        #mensajeEstado {
+            margin-top: 14px;
+            text-align: center;
+            font-size: .9rem;
+            font-weight: 600;
+            min-height: 1.2em;
+        }
+
+        /* =================================================================
+           VISTA: TABLAS HISTORIAL Y REPORTES
+           ================================================================= */
+        .filtros-historial {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: end;
+            gap: 12px;
+            margin-bottom: 20px;
+            background: var(--blanco);
+            border: 1px solid var(--borde);
+            border-radius: var(--radio);
+            padding: 18px;
+            box-shadow: var(--sombra);
+        }
+        .filtros-historial label {
+            display: block;
+            font-size: .75rem;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: var(--texto-gris);
+            margin-bottom: 6px;
+        }
+        .filtros-historial input {
+            padding: 10px 12px;
+            border: 1px solid var(--borde);
+            border-radius: 8px;
+            font-size: .9rem;
+        }
+        .filtros-historial button {
+            background: var(--vino-oscuro);
+            color: var(--blanco);
+            border: none;
+            padding: 11px 20px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: .85rem;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        .filtros-historial button:hover { background: var(--vino-claro); }
+
+        table.tabla-datos {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--blanco);
+            border-radius: var(--radio);
+            overflow: hidden;
+            box-shadow: var(--sombra);
+        }
+        table.tabla-datos th {
+            background: var(--vino-oscuro);
+            color: var(--blanco);
+            text-align: left;
+            padding: 14px 16px;
+            font-size: .8rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+        table.tabla-datos td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--borde);
+            font-size: .9rem;
+            vertical-align: top;
+        }
+        .badge-impreso {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: .75rem;
+            font-weight: 700;
+        }
+        .badge-si { background: #e2f0e2; color: #3e703e; }
+        .badge-no { background: #f7e2dd; color: #c1442d; }
+
+        .top-productos {
+            margin-top: 24px;
+            background: var(--blanco);
+            border: 1px solid var(--borde);
+            border-radius: var(--radio);
+            padding: 24px;
+            box-shadow: var(--sombra);
+        }
+        .fila-top-producto {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--borde);
+            font-size: .95rem;
+        }
+        .fila-top-producto .cantidad-vendida {
+            font-family: 'Courier New', monospace;
+            background: var(--crema);
+            border: 1px solid var(--vino-claro);
+            color: var(--vino-oscuro);
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-weight: 800;
+        }
+
+        /* =================================================================
+           VISTA: CONFIGURACIÓN
+           ================================================================= */
+        .form-config {
+            max-width: 540px;
+            background: var(--blanco);
+            border: 1px solid var(--borde);
+            border-radius: var(--radio);
+            padding: 28px;
+            box-shadow: var(--sombra);
+        }
+        .campo-config { margin-bottom: 20px; }
+        .campo-config label {
+            display: block;
+            font-size: .85rem;
+            font-weight: 700;
+            color: var(--texto-oscuro);
+            margin-bottom: 6px;
+        }
+        .campo-config small {
+            display: block;
+            color: var(--texto-gris);
+            font-size: .75rem;
+            margin-top: 4px;
+        }
+        .campo-config input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--borde);
+            border-radius: 8px;
+            font-size: .95rem;
+        }
+        .campo-config input:focus { outline: none; border-color: var(--vino-claro); }
+        #btnGuardarConfig {
+            background: var(--vino-oscuro);
+            color: var(--blanco);
+            border: none;
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            cursor: pointer;
+            font-size: .9rem;
+            width: 100%;
+        }
+        #btnGuardarConfig:hover { background: var(--vino-claro); }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <header>
+        <div class="marca">
+            <img src="img/png/logo.png" alt="Drip & Drop" class="logo-icono">
+            <h1>Drip <span>&</span> Drop</h1>
+        </div>
+        <div class="acciones-header">
+            <div id="ultimaOrden">
+                <small>Última orden</small>
+                #---
+            </div>
+        </div>
+    </header>
+
+    <nav class="nav-principal">
+        <button class="nav-btn" data-vista="inicio">Inicio</button>
+        <button class="nav-btn" data-vista="venta">Comandas</button>
+        <button class="nav-btn" data-vista="historial">Historial</button>
+        <button class="nav-btn" data-vista="reportes">Reportes</button>
+        <button class="nav-btn" data-vista="configuracion">Configuración</button>
+    </nav>
+
+    <!-- VISTA: INICIO -->
+    <section class="vista" id="vista-inicio">
+        <div class="hero-inicio">
+            <h2>Drip <span>&</span> Drop</h2>
+            <p>Sistema de gestión de comandas y punto de venta.</p>
+            <button id="btnIrAVenta">Abrir Comandas</button>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="etiqueta">Órdenes de hoy</div>
+                <div class="valor" id="statOrdenesHoy">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="etiqueta">Vendido hoy</div>
+                <div class="valor" id="statVentaHoy">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="etiqueta">Ticket promedio hoy</div>
+                <div class="valor" id="statTicketHoy">-</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- VISTA: PUNTO DE VENTA -->
+    <section class="vista" id="vista-venta">
+        <div id="ventaGrid">
+            <section id="menu">
+                <h2>Catálogo</h2>
+                <input type="text" id="buscador" placeholder="Buscar platillo, bebida, promoción...">
+                <div id="tabsCategorias"></div>
+                <div id="gridMenu"></div>
+            </section>
+
+            <section id="carrito">
+                <h2>Orden Actual</h2>
+                <ul id="listaCarrito">
+                    <li class="vacio">No hay productos seleccionados</li>
+                </ul>
+                <div id="totalBox">
+                    <span>Total</span>
+                    <span id="totalGeneral">$0.00</span>
+                </div>
+                <button id="btnImprimir" disabled>Generar Ticket</button>
+                <div id="mensajeEstado"></div>
+            </section>
+        </div>
+    </section>
+
+    <!-- VISTA: HISTORIAL -->
+    <section class="vista" id="vista-historial">
+        <h2>Historial de órdenes</h2>
+        <div class="filtros-historial">
+            <div>
+                <label for="historialDesde">Desde</label>
+                <input type="date" id="historialDesde">
+            </div>
+            <div>
+                <label for="historialHasta">Hasta</label>
+                <input type="date" id="historialHasta">
+            </div>
+            <button id="btnFiltrarHistorial">Filtrar</button>
+            <button id="btnLimpiarFiltroHistorial" style="background:transparent; color:var(--vino-oscuro); border:1px solid var(--vino-oscuro);">Ver todo</button>
+        </div>
+        <div id="contenedorHistorial"></div>
+    </section>
+
+    <!-- VISTA: REPORTES -->
+    <section class="vista" id="vista-reportes">
+        <h2>Reportes de Ventas</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="etiqueta">Total de órdenes</div>
+                <div class="valor" id="repOrdenes">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="etiqueta">Total vendido</div>
+                <div class="valor" id="repTotal">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="etiqueta">Ticket promedio</div>
+                <div class="valor" id="repPromedio">-</div>
+            </div>
+        </div>
+        <div class="top-productos">
+            <h2 style="margin-bottom:16px;">Productos más vendidos</h2>
+            <div id="listaTopProductos"></div>
+        </div>
+    </section>
+
+    <!-- VISTA: CONFIGURACIÓN -->
+    <section class="vista" id="vista-configuracion">
+        <h2>Configuración del Sistema</h2>
+        <form class="form-config" id="formConfig">
+            <div class="campo-config">
+                <label for="cfgNombreNegocio">Nombre del negocio (Ticket)</label>
+                <input type="text" id="cfgNombreNegocio">
+            </div>
+            <div class="campo-config">
+                <label for="cfgNombreImpresora">Recurso de impresora (Windows)</label>
+                <input type="text" id="cfgNombreImpresora" placeholder="//localhost/DripDrop">
+            </div>
+            <div class="campo-config">
+                <label for="cfgRutaLogo">Ruta del logo en el servidor</label>
+                <input type="text" id="cfgRutaLogo">
+            </div>
+            <div class="campo-config">
+                <label for="cfgAnchoLogo">Ancho máximo del logo (px)</label>
+                <input type="number" id="cfgAnchoLogo" min="8" max="384" step="8">
+            </div>
+            <div class="campo-config">
+                <label for="cfgUmbralLogo">Umbral de negro (0-255)</label>
+                <input type="number" id="cfgUmbralLogo" min="0" max="255">
+            </div>
+            <button type="submit" id="btnGuardarConfig">Guardar Cambios</button>
+            <div id="mensajeConfig" style="margin-top:14px; font-weight:bold;"></div>
+        </form>
+    </section>
+</div>
+
+<script>
+
+    const CONTEXTO = '/Drip_and_Drop_war_exploded';
+
+    function API(ruta) {
+        return CONTEXTO + '/api/' + ruta;
+    }
+    /**
+     * NAVEGACIÓN Y ARRANQUE DIRECTO
+     */
+    const botonesNav = document.querySelectorAll('.nav-btn');
+    const vistas = document.querySelectorAll('.vista');
+
+    function mostrarVista(nombre){
+        vistas.forEach(v => v.classList.toggle('activa', v.id === 'vista-' + nombre));
+        botonesNav.forEach(b => b.classList.toggle('activo', b.dataset.vista === nombre));
+
+        if (nombre === 'historial') cargarHistorial();
+        if (nombre === 'reportes') cargarReportes();
+        if (nombre === 'configuracion') cargarConfiguracion();
+        if (nombre === 'inicio') cargarDatosInicio();
+    }
+
+    botonesNav.forEach(btn => {
+        btn.addEventListener('click', () => mostrarVista(btn.dataset.vista));
+    });
+    document.getElementById('btnIrAVenta').addEventListener('click', () => mostrarVista('venta'));
+
+    // Iniciar app automáticamente
+    mostrarVista('inicio');
+    cargarDatosInicio();
+
+    /**
+     * MENÚ DE PRODUCTOS
+     */
+    const MENU = [
+        // ---------- Menu a la Carta ----------
+        { categoria:"A la Carta", nombre:"Jamón y Queso", precio:30 },
+        { categoria:"A la Carta", nombre:"Pollo Deshebrado", precio:35 },
+        { categoria:"A la Carta", nombre:"Queso Panela", precio:35 },
+        { categoria:"A la Carta", nombre:"Pechuga Asada", precio:35 },
+        { categoria:"A la Carta", nombre:"Atún", precio:35 },
+        { categoria:"A la Carta", nombre:"Salchicha", precio:30 },
+        { categoria:"A la Carta", nombre:"Carne Asada c/Ensalada", precio:65 },
+        { categoria:"A la Carta", nombre:"Carne Asada c/Papas", precio:65 },
+        { categoria:"A la Carta", nombre:"Pechuga Asada c/Ensalada", precio:65 },
+        { categoria:"A la Carta", nombre:"Pechuga Asada c/Papas", precio:65 },
+        { categoria:"A la Carta", nombre:"Pechuga Empanizada c/Ensalada", precio:65 },
+        { categoria:"A la Carta", nombre:"Pechuga Empanizada c/Papas", precio:65 },
+        { categoria:"A la Carta", nombre:"Chilaquiles c/Pollo", precio:45 },
+        { categoria:"A la Carta", nombre:"Chilaquiles c/Huevo", precio:45 },
+        { categoria:"A la Carta", nombre:"Chilaquiles c/Carne Asada", precio:50 },
+        { categoria:"A la Carta", nombre:"Enchiladas Verdes c/Pollo", precio:45 },
+        { categoria:"A la Carta", nombre:"Enchiladas de Mole c/Pollo", precio:50 },
+        { categoria:"A la Carta", nombre:"Enchiladas Verdes c/Carne Asada", precio:50 },
+        { categoria:"A la Carta", nombre:"Enfrijoladas c/Pollo", precio:50 },
+        { categoria:"A la Carta", nombre:"Huevos al Gusto", precio:55, nota:"A la mexicana, salchicha, jamón, tocino, rancheros, etc." },
+
+        // ---------- Jugos y Licuados ----------
+        { categoria:"Bebidas", nombre:"Jugo de Naranja", precio:25 },
+        { categoria:"Bebidas", nombre:"Jugo Verde", precio:30 },
+        { categoria:"Bebidas", nombre:"Licuado 1 Ingrediente", precio:30 },
+        { categoria:"Bebidas", nombre:"Licuado 2 Ingredientes", precio:35, nota:"Fresa, plátano, mamey, chocolate, avena, etc." },
+
+        // ---------- Ensaladas y Postres ----------
+        { categoria:"Postres", nombre:"Coctel Frutas Chico (2+)", precio:26 },
+        { categoria:"Postres", nombre:"Coctel Frutas Chico (1)", precio:30 },
+        { categoria:"Postres", nombre:"Coctel Frutas Grande", precio:40 },
+        { categoria:"Postres", nombre:"Coctel Zanahoria y Pepino", precio:35 },
+        { categoria:"Postres", nombre:"Coctel Jícama y Pepino Gde", precio:35 },
+        { categoria:"Ensaladas", nombre:"Ensalada Verde", precio:45 },
+        { categoria:"Ensaladas", nombre:"Ensalada de Atún", precio:65 },
+        { categoria:"Ensaladas", nombre:"Ensalada de Pollo", precio:65 },
+        { categoria:"Ensaladas", nombre:"Ensalada del Chef", precio:65 },
+        { categoria:"Ensaladas", nombre:"Ensalada Italiana", precio:70 },
+        { categoria:"Ensaladas", nombre:"Verduras al Vapor", precio:50 },
+        { categoria:"Postres", nombre:"Fresas con Crema", precio:35 },
+        { categoria:"Postres", nombre:"Plátanos con Crema", precio:30 },
+        { categoria:"Postres", nombre:"Plátanos Fritos", precio:30 },
+        { categoria:"Postres", nombre:"Arroz con Leche", precio:20 },
+
+        // ---------- Cuernitos ----------
+        { categoria:"Cuernitos", nombre:"Cuernito Jamón c/Queso", precio:30 },
+        { categoria:"Cuernitos", nombre:"Cuernito Salchicha", precio:30 },
+        { categoria:"Cuernitos", nombre:"Cuernito Choriqueso", precio:43 },
+        { categoria:"Cuernitos", nombre:"Cuernito Milanesa", precio:45 },
+
+        // ---------- Desayunos ----------
+        { categoria:"Desayunos", nombre:"Desayuno 1: Huevos", precio:65, nota:"Con frijoles, fruta y café" },
+        { categoria:"Desayunos", nombre:"Huevos Rancheros", precio:65 },
+        { categoria:"Desayunos", nombre:"Huevos Divorciados", precio:65 },
+        { categoria:"Desayunos", nombre:"Huevos al Albañil", precio:60 },
+        { categoria:"Desayunos", nombre:"Desayuno 2: Molletes", precio:55, nota:"Con pico de gallo, fruta y café" },
+        { categoria:"Desayunos", nombre:"Desayuno 3: Chilaquiles c/Pollo", precio:63, nota:"Con fruta y café" },
+        { categoria:"Desayunos", nombre:"Desayuno 4: Enchiladas", precio:63, nota:"Con fruta y café" },
+        { categoria:"Desayunos", nombre:"Desayuno 5: Hot Cakes", precio:60, nota:"Con mermelada, fruta y café" },
+        { categoria:"Desayunos", nombre:"Desayuno 6: Chilaquiles c/Huevo", precio:60, nota:"Con fruta y café" },
+        { categoria:"Desayunos", nombre:"Desayuno 7: Chilaquiles c/Asada", precio:67, nota:"Con fruta y café" },
+        { categoria:"Desayunos", nombre:"Desayuno 8: Omelette", precio:65, nota:"En salsa verde con frijoles, fruta y café" },
+
+        // ---------- Tortas ----------
+        { categoria:"Tortas", nombre:"Alemana (Milanesa, Jamón, Queso) Gde", precio:75 },
+        { categoria:"Tortas", nombre:"Trailera (Milanesa, Salchicha, Queso) Gde", precio:75 },
+        { categoria:"Tortas", nombre:"Hawaiana (Jamón, Queso, Piña) Gde", precio:75 },
+        { categoria:"Tortas", nombre:"Caprichosa (Milanesa, Pierna, Queso) Gde", precio:75 },
+        { categoria:"Tortas", nombre:"Pachuqueña (Milanesa, Queso, Piña) Gde", precio:75 },
+        { categoria:"Tortas", nombre:"Española (Milanesa, Chorizo, Queso) Gde", precio:75 },
+        { categoria:"Tortas", nombre:"Oaxaqueña (Pierna, Salchicha, Queso) Gde", precio:75 },
+        { categoria:"Tortas", nombre:"Toluqueña (Pierna, Chorizo, Queso) Gde", precio:75 },
+        { categoria:"Tortas", nombre:"Politécnica (Especial) Gde", precio:90 },
+        { categoria:"Tortas", nombre:"Alemana Chica", precio:43 },
+        { categoria:"Tortas", nombre:"Trailera Chica", precio:43 },
+        { categoria:"Tortas", nombre:"Hawaiana Chica", precio:43 },
+        { categoria:"Tortas", nombre:"Caprichosa Chica", precio:43 },
+        { categoria:"Tortas", nombre:"Pachuqueña Chica", precio:43 },
+        { categoria:"Tortas", nombre:"Española Chica", precio:43 },
+        { categoria:"Tortas", nombre:"Oaxaqueña Chica", precio:43 },
+        { categoria:"Tortas", nombre:"Toluqueña Chica", precio:43 },
+
+        // ---------- Promociones ----------
+        { categoria:"Promociones", nombre:"Promo 1: Burrito Choriqueso", precio:60, nota:"Papas, arroz y agua" },
+        { categoria:"Promociones", nombre:"Promo 2: Burrito Campechano", precio:60, nota:"Papas, arroz y agua" },
+        { categoria:"Promociones", nombre:"Promo 3: 2 Tacos Campechanos", precio:45, nota:"Arroz y agua" },
+        { categoria:"Promociones", nombre:"Promo 4: Gordita Chicharrón", precio:38, nota:"Arroz/papas y agua" },
+        { categoria:"Promociones", nombre:"Promo 5: 2 Tacos Cochinita", precio:50, nota:"Arroz y agua" },
+        { categoria:"Promociones", nombre:"Promo 6: Cuernito Jamón/Salchicha", precio:55, nota:"Con licuado de chocolate 1/2L" },
+        { categoria:"Promociones", nombre:"Promo 7: Chilaquiles Pollo", precio:55, nota:"Arroz y agua" },
+        { categoria:"Promociones", nombre:"Promo 8: Enchiladas Verdes Pollo", precio:55, nota:"Arroz y agua" },
+        { categoria:"Promociones", nombre:"Promo 9: Enmoladas Pollo", precio:60, nota:"Arroz y agua" },
+        { categoria:"Promociones", nombre:"Promo 10: Gringas", precio:53, nota:"Papas y agua" },
+        { categoria:"Promociones", nombre:"Promo 11: 2 Tacos Bistec", precio:50, nota:"Arroz, papas y agua" },
+        { categoria:"Promociones", nombre:"Promo 12: Chilaquiles Bistec", precio:62, nota:"Arroz y agua" },
+        { categoria:"Promociones", nombre:"Promo 13: Sincronizada", precio:38, nota:"Papas y agua" },
+        { categoria:"Promociones", nombre:"Promo 14: Burrito Bistec", precio:62, nota:"Papas, arroz y agua" },
+        { categoria:"Promociones", nombre:"Promo 15: Gordita Campechana/Bistec", precio:48, nota:"Papas" },
+        { categoria:"Promociones", nombre:"Promo 16: Burrito Pastor", precio:62, nota:"Papas, arroz y agua" },
+        { categoria:"Promociones", nombre:"Club Sándwich", precio:50, nota:"Papas y agua" },
+
+        // ---------- Hamburguesas y Antojitos ----------
+        { categoria:"Hamburguesas", nombre:"Hamburguesa Hawaiana c/Papas", precio:55 },
+        { categoria:"Hamburguesas", nombre:"Hamburguesa Sencilla c/Papas", precio:50 },
+        { categoria:"Hamburguesas", nombre:"Hamburguesa Politécnica c/Papas", precio:60 },
+        { categoria:"Hamburguesas", nombre:"Salchipapas", precio:40 },
+        { categoria:"Hamburguesas", nombre:"1 Hot Dog c/Papas y Refresco", precio:35 },
+        { categoria:"Hamburguesas", nombre:"2 Hot Dogs c/Papas y Refresco", precio:48 },
+        { categoria:"Hamburguesas", nombre:"Orden 3 Hot Dogs", precio:50 },
+        { categoria:"Antojitos", nombre:"Gordita Chicharrón", precio:30 },
+        { categoria:"Antojitos", nombre:"Gordita Bistec/Campechana/Pastor/Tinga", precio:35 },
+        { categoria:"Antojitos", nombre:"Torta Chilaquiles Pollo / Salchicha / Pierna", precio:30 },
+        { categoria:"Antojitos", nombre:"Papas Francesa c/Queso", precio:38 },
+        { categoria:"Antojitos", nombre:"Taco Bistec/Pastor/Campechano/Longaniza", precio:30 },
+        { categoria:"Antojitos", nombre:"Dorados Pollo / Papa (4)", precio:33 },
+        { categoria:"Antojitos", nombre:"Nachos c/Queso", precio:30 },
+        { categoria:"Antojitos", nombre:"Sope Sencillo", precio:25 },
+        { categoria:"Antojitos", nombre:"Sope Tinga/Pollo/Bistec", precio:32 },
+        { categoria:"Antojitos", nombre:"Sope Choriqueso", precio:36 },
+        { categoria:"Antojitos", nombre:"Huarache Sencillo", precio:30 },
+        { categoria:"Antojitos", nombre:"Huarache Carne", precio:40 },
+        { categoria:"Antojitos", nombre:"Quesadilla Guisado", precio:30 },
+        { categoria:"Antojitos", nombre:"Quesadilla Choriqueso", precio:35 },
+        { categoria:"Antojitos", nombre:"Maruchan", precio:25 },
+        { categoria:"Antojitos", nombre:"Pambazo Tinga", precio:35 },
+        { categoria:"Antojitos", nombre:"Pambazo Papa/Chorizo", precio:28 },
+
+        // ---------- Comida Corrida ----------
+        { categoria:"Comida Corrida", nombre:"Menú del Día", precio:65, nota:"Sopa, arroz, guisado, enchiladas y tacos dorados. Incluye agua y tortillas" }
+    ];
+
+    let carrito = [];
+    let categoriaActiva = "Todas";
+    let textoBusqueda = "";
+
+    const listaCarritoEl = document.getElementById('listaCarrito');
+    const totalGeneralEl = document.getElementById('totalGeneral');
+    const btnImprimir = document.getElementById('btnImprimir');
+    const mensajeEstadoEl = document.getElementById('mensajeEstado');
+    const ultimaOrdenEl = document.getElementById('ultimaOrden');
+    const gridMenuEl = document.getElementById('gridMenu');
+    const tabsCategoriasEl = document.getElementById('tabsCategorias');
+    const buscadorEl = document.getElementById('buscador');
+
+    function construirTabsCategorias(){
+        const categorias = ["Todas", ...new Set(MENU.map(p => p.categoria))];
+        tabsCategoriasEl.innerHTML = '';
+        categorias.forEach(cat => {
+            const btn = document.createElement('button');
+            btn.className = 'tab-categoria' + (cat === categoriaActiva ? ' activa' : '');
+            btn.textContent = cat;
+            btn.dataset.categoria = cat;
+            tabsCategoriasEl.appendChild(btn);
+        });
+    }
+
+    function renderMenu(){
+        const filtro = textoBusqueda.trim().toLowerCase();
+        const productosFiltrados = MENU.filter(p => {
+            const coincideCategoria = categoriaActiva === "Todas" || p.categoria === categoriaActiva;
+            const coincideBusqueda = filtro === '' || p.nombre.toLowerCase().includes(filtro);
+            return coincideCategoria && coincideBusqueda;
+        });
+
+        gridMenuEl.innerHTML = '';
+        if (productosFiltrados.length === 0){
+            gridMenuEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--texto-gris)">No se encontraron productos</div>';
+            return;
+        }
+
+        productosFiltrados.forEach(p => {
+            const tarjeta = document.createElement('div');
+            tarjeta.className = 'producto';
+            tarjeta.dataset.nombre = p.nombre;
+            tarjeta.dataset.precio = p.precio;
+            tarjeta.innerHTML = `
+      <div class="categoria-tag">${p.categoria}</div>
+      <div class="nombre">${p.nombre}</div>
+      ${p.nota ? `<div class="nota">${p.nota}</div>` : ''}
+      <div class="precio">${formatoMoneda(p.precio)}</div>
+      <button class="btn-agregar">Agregar</button>
+    `;
+            gridMenuEl.appendChild(tarjeta);
+        });
+    }
+
+    tabsCategoriasEl.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('tab-categoria')) return;
+        categoriaActiva = e.target.dataset.categoria;
+        construirTabsCategorias();
+        renderMenu();
+    });
+
+    buscadorEl.addEventListener('input', (e) => {
+        textoBusqueda = e.target.value;
+        renderMenu();
+    });
+
+    function formatoMoneda(valor){ return '$' + valor.toFixed(2); }
+
+    function agregarAlCarrito(nombre, precio){
+        const existente = carrito.find(item => item.nombre === nombre);
+        if (existente) existente.cantidad += 1;
+        else carrito.push({ nombre, precio, cantidad: 1 });
+        renderCarrito();
+    }
+
+    function cambiarCantidadCarrito(nombre, delta){
+        const existente = carrito.find(item => item.nombre === nombre);
+        if (!existente) return;
+        existente.cantidad += delta;
+        if (existente.cantidad <= 0) carrito = carrito.filter(item => item.nombre !== nombre);
+        renderCarrito();
+    }
+
+    function renderCarrito(){
+        listaCarritoEl.innerHTML = '';
+        if (carrito.length === 0){
+            listaCarritoEl.innerHTML = '<li class="vacio">No hay productos seleccionados</li>';
+            btnImprimir.disabled = true;
+        } else {
+            carrito.forEach(item => {
+                const subtotal = item.precio * item.cantidad;
+                const li = document.createElement('li');
+                li.innerHTML = `
+        <span class="nombreItem">${item.nombre}</span>
+        <div class="controlesCantidad">
+          <button class="btn-cantidad" data-accion="restar" data-nombre="${item.nombre}">−</button>
+          <span class="cantidad">${item.cantidad}</span>
+          <button class="btn-cantidad" data-accion="sumar" data-nombre="${item.nombre}">+</button>
+        </div>
+        <span class="subtotal">${formatoMoneda(subtotal)}</span>
+      `;
+                listaCarritoEl.appendChild(li);
+            });
+            btnImprimir.disabled = false;
+        }
+        const total = carrito.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+        totalGeneralEl.textContent = formatoMoneda(total);
+    }
+
+    document.getElementById('gridMenu').addEventListener('click', (e) => {
+        if (!e.target.classList.contains('btn-agregar')) return;
+        const tarjeta = e.target.closest('.producto');
+        agregarAlCarrito(tarjeta.dataset.nombre, parseFloat(tarjeta.dataset.precio));
+    });
+
+    listaCarritoEl.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('btn-cantidad')) return;
+        cambiarCantidadCarrito(e.target.dataset.nombre, e.target.dataset.accion === 'sumar' ? 1 : -1);
+    });
+
+    btnImprimir.addEventListener('click', async () => {
+
+        if (carrito.length === 0) return;
+
+        const total = carrito.reduce(
+            (acc, item) => acc + (item.precio * item.cantidad), 0
+        );
+
+        const payload = {
+            productos: carrito,
+            total: total
+        };
+
+        btnImprimir.disabled = true;
+        btnImprimir.textContent = 'Enviando...';
+        mensajeEstadoEl.textContent = '';
+
+        try {
+
+            const respuesta = await fetch(API('orden'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await respuesta.json();
+
+            if (!respuesta.ok || !data.exito) {
+                throw new Error(data.mensaje || 'Error del servidor: ' + respuesta.status);
+            }
+
+            ultimaOrdenEl.innerHTML =
+                `<small>Última orden</small>#${data.numero_orden}`;
+
+            alert('Orden #' + data.numero_orden + ' generada e impresa.');
+
+            carrito = [];
+            renderCarrito();
+
+            mensajeEstadoEl.textContent = 'Orden impresa exitosamente.';
+            mensajeEstadoEl.style.color = '#8fd18f';
+
+        } catch (error) {
+
+            console.error('Error al generar la orden:', error);
+
+            mensajeEstadoEl.textContent = error.message;
+            mensajeEstadoEl.style.color = '#e88a75';
+
+        } finally {
+
+            btnImprimir.disabled = carrito.length === 0;
+            btnImprimir.textContent = 'Generar Ticket';
+        }
+    });
+
+    construirTabsCategorias();
+    renderMenu();
+    renderCarrito();
+
+    /**
+     * MÓDULOS DE HISTORIAL, REPORTES Y CONFIGURACIÓN (CONECTADOS A SERVLET)
+     */
+    async function cargarHistorial(desde = null, hasta = null){
+        const contenedor = document.getElementById('contenedorHistorial');
+        contenedor.innerHTML = '<p style="text-align:center;">Cargando...</p>';
+        let url = API('historial');
+        const parametros = [];
+        if (desde) parametros.push('desde=' + encodeURIComponent(desde));
+        if (hasta) parametros.push('hasta=' + encodeURIComponent(hasta));
+        if (parametros.length) url += '?' + parametros.join('&');
+
+        try {
+            const respuesta = await fetch(url);
+            const data = await respuesta.json();
+            const ordenes = data.ordenes || [];
+            if (ordenes.length === 0){
+                contenedor.innerHTML = '<div style="text-align:center;padding:40px;color:var(--texto-gris)">No hay órdenes registradas</div>';
+                return;
+            }
+            let filas = '';
+            ordenes.forEach(orden => {
+                const resumen = (orden.productos || []).map(p => `${p.cantidad}x ${p.nombre}`).join(', ');
+                const badge = orden.impreso ? '<span class="badge-impreso badge-si">Impreso</span>' : '<span class="badge-impreso badge-no">Falló</span>';
+                filas += `<tr>
+        <td>#${orden.numero_orden}</td>
+        <td>${orden.fecha_texto || orden.fecha}<br><small style="color:var(--texto-gris);">${orden.hora_texto || orden.hora}</small></td>
+        <td>${resumen}</td>
+        <td>${formatoMoneda(orden.total)}</td>
+        <td>${badge}</td>
+      </tr>`;
+            });
+            contenedor.innerHTML = `<table class="tabla-datos"><thead><tr><th>Orden</th><th>Fecha / Hora</th><th>Productos</th><th>Total</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table>`;
+        } catch (e) {
+            contenedor.innerHTML = '<div style="text-align:center;padding:40px;color:#e88a75">Error al cargar historial.</div>';
+        }
+    }
+
+    document.getElementById('btnFiltrarHistorial').addEventListener('click', () => {
+        cargarHistorial(document.getElementById('historialDesde').value || null, document.getElementById('historialHasta').value || null);
+    });
+    document.getElementById('btnLimpiarFiltroHistorial').addEventListener('click', () => {
+        document.getElementById('historialDesde').value = '';
+        document.getElementById('historialHasta').value = '';
+        cargarHistorial();
+    });
+
+    async function cargarReportes(){
+        try {
+            const respuesta = await fetch(API('historial'));
+            const data = await respuesta.json();
+            const ordenes = data.ordenes || [];
+            document.getElementById('repOrdenes').textContent = ordenes.length;
+            const totalVendido = ordenes.reduce((acc, o) => acc + parseFloat(o.total || 0), 0);
+            document.getElementById('repTotal').textContent = formatoMoneda(totalVendido);
+            document.getElementById('repPromedio').textContent = formatoMoneda(ordenes.length ? totalVendido / ordenes.length : 0);
+
+            const conteo = {};
+            ordenes.forEach(o => (o.productos || []).forEach(p => conteo[p.nombre] = (conteo[p.nombre] || 0) + parseInt(p.cantidad || 0)));
+            const top = Object.entries(conteo).sort((a,b) => b[1] - a[1]).slice(0,10);
+            const contTop = document.getElementById('listaTopProductos');
+            if (top.length === 0) contTop.innerHTML = '<div style="text-align:center;padding:20px;color:var(--texto-gris)">Sin ventas registradas</div>';
+            else contTop.innerHTML = top.map(([n, c]) => `<div class="fila-top-producto"><span>${n}</span><span class="cantidad-vendida">${c} und</span></div>`).join('');
+        } catch (e) {
+            document.getElementById('listaTopProductos').innerHTML = 'Error al cargar reporte.';
+        }
+    }
+
+    async function cargarDatosInicio(){
+        try {
+            const ahora = new Date();
+
+            const hoyISO =
+                ahora.getFullYear() + '-' +
+                String(ahora.getMonth() + 1).padStart(2, '0') + '-' +
+                String(ahora.getDate()).padStart(2, '0');
+
+            const respuesta = await fetch(
+                API('historial') + '?desde=' + hoyISO + '&hasta=' + hoyISO
+            );
+            const data = await respuesta.json();
+            const ordenes = data.ordenes || [];
+            document.getElementById('statOrdenesHoy').textContent = ordenes.length;
+            const totalHoy = ordenes.reduce((acc, o) => acc + parseFloat(o.total || 0), 0);
+            document.getElementById('statVentaHoy').textContent = formatoMoneda(totalHoy);
+            document.getElementById('statTicketHoy').textContent = formatoMoneda(ordenes.length ? totalHoy / ordenes.length : 0);
+        } catch (e) {}
+    }
+
+    async function cargarConfiguracion(){
+        const msg = document.getElementById('mensajeConfig');
+        msg.textContent = '';
+        try {
+            const respuesta = await fetch(API('configuracion'));
+            const data = await respuesta.json();
+            const cfg = data.configuracion || {};
+            document.getElementById('cfgNombreNegocio').value = cfg.nombre_negocio || '';
+            document.getElementById('cfgNombreImpresora').value = cfg.nombre_impresora || '';
+            document.getElementById('cfgRutaLogo').value = cfg.ruta_logo || '';
+            document.getElementById('cfgAnchoLogo').value = cfg.ancho_maximo_logo_px ?? 300
+            document.getElementById('cfgUmbralLogo').value = cfg.umbral_logo ?? 190
+        } catch (e) {
+            msg.textContent = 'Error leyendo configuración.';
+            msg.style.color = '#e88a75';
+        }
+    }
+
+    document.getElementById('formConfig').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('mensajeConfig');
+        msg.textContent = 'Guardando...';
+        msg.style.color = 'var(--texto-oscuro)';
+        const payload = {
+            nombre_negocio: document.getElementById('cfgNombreNegocio').value.trim(),
+            nombre_impresora: document.getElementById('cfgNombreImpresora').value.trim(),
+            ruta_logo: document.getElementById('cfgRutaLogo').value.trim(),
+            ancho_maximo_logo_px: parseInt(document.getElementById('cfgAnchoLogo').value) || 300,
+            umbral_logo: parseInt(document.getElementById('cfgUmbralLogo').value) || 0
+        };
+        try {
+            const respuesta = await fetch(API('configuracion'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await respuesta.json();
+            if (data.exito){
+                msg.textContent = '✅ Configuración guardada.';
+                msg.style.color = '#3e703e';
+            } else {
+                msg.textContent = '❌ ' + data.mensaje;
+                msg.style.color = '#c1442d';
+            }
+        } catch (e) {
+            msg.textContent = '❌ Error de red.';
+            msg.style.color = '#c1442d';
+        }
+    });
+</script>
+</body>
+</html>
